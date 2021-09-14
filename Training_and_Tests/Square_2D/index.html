@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Square</title>
+
+    <script>
+        'use strict';
+
+        function main() {
+            const canvas = document.getElementById('webgl-canvas');
+            const gl = canvas.getContext('webgl2');
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            var vsGLSL = `#version 300 es
+            precision highp float;
+
+            in vec2 a_texcoord;
+
+            in vec3 aVertexPosition;
+
+            out vec2 v_texcoord;
+
+            void main(void){
+                v_texcoord = a_texcoord;
+                gl_Position = vec4(aVertexPosition,1);
+            }
+        `;
+
+            var fsGLSL = `#version 300 es
+            precision highp float;
+            
+            in vec2 v_texcoord;
+
+            uniform sampler2D u_texture;
+
+            out vec4 outColor;
+            
+            void main(void){
+                outColor = texture(u_texture,v_texcoord);
+            }
+        `;
+
+
+            const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vsGLSL);
+            gl.compileShader(vertexShader);
+            if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                throw new Error(gl.getShaderInfoLog(vertexShader))
+            };
+
+            const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fsGLSL);
+            gl.compileShader(fragmentShader);
+            if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+                throw new Error(gl.getShaderInfoLog(fragmentShader))
+            };
+
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                throw new Error(gl.getProgramInfoLog(program))
+            };
+
+            gl.useProgram(program);
+            program.aVertexPosition = gl.getAttribLocation(program, 'aVertexPosition');
+            var texcoordAttributeLocation = gl.getAttribLocation(program, "a_texcoord");
+
+            //textura
+            // create the texcoord buffer, make it the current ARRAY_BUFFER
+            // and copy in the texcoord values
+            var texcoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+            setTexcoords(gl);
+
+            // Turn on the attribute
+            gl.enableVertexAttribArray(texcoordAttributeLocation);
+
+            // Tell the attribute how to get data out of texcoordBuffer (ARRAY_BUFFER)
+            var size = 2;          // 2 components per iteration
+            var type = gl.FLOAT;   // the data is 32bit floating point values
+            var normalize = true;  // convert from 0-255 to 0.0-1.0
+            var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next texcoord
+            var offset = 0;        // start at the beginning of the buffer
+            gl.vertexAttribPointer(
+                texcoordAttributeLocation, size, type, normalize, stride, offset);
+
+            // Create a texture.
+            var texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+
+            // Fill the texture with a 1x1 blue pixel.
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([0, 0, 255, 255]));
+
+            // Asynchronously load an image
+            var image = new Image();
+            image.src = "./textura_final.png";
+
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_2D);
+
+
+            let vertices = [
+                -0.5, 0.5, 0,
+                0.5, 0.5, 0,
+                -0.5, -0.5, 0,
+                0.5, -0.5, 0
+            ];
+
+            let indices = [
+                0, 2, 1,
+                1, 2, 3,
+            ];
+
+            let squareVertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+            let squareIndexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, squareIndexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexBuffer);
+            gl.vertexAttribPointer(program.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(program.aVertexPosition);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, squareIndexBuffer);
+
+            gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        }
+
+        // Fill the buffer with texture coordinates for the F.
+        function setTexcoords(gl) {
+            gl.bufferData(
+                gl.ARRAY_BUFFER,
+                new Float32Array([
+                    0, 0,
+                    0, 1,
+                    1, 0,
+                    0, 1,
+                ]),
+                gl.STATIC_DRAW);
+        }
+
+        window.onload = main;
+    </script>
+</head>
+
+<body>
+    <canvas id="webgl-canvas">
+        Seu Navegador não possuí compatibilidade com o elemento Canvas do HTML5.
+    </canvas>
+</body>
+
+</html>
